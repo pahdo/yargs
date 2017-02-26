@@ -919,35 +919,26 @@ function Yargs (processArgs, cwd, parentRequire) {
 
   Object.defineProperty(self, 'argv', {
     get: function () {
-      var args = null
-
-      try {
-        args = self._parseArgs(processArgs)
-      } catch (err) {
-        if (err instanceof YError) usage.fail(err.message, err)
-        else throw err
-      }
-
-      return args
+      return self._parseArgs(processArgs)
     },
     enumerable: true
   })
 
   self._parseArgs = function (args, shortCircuit, _skipValidation) {
+    var skipValidation = !!_skipValidation
+    args = args || processArgs
+
+    options.__ = y18n.__
+    options.configuration = pkgUp()['yargs'] || {}
+    const parsed = Parser.detailed(args, options)
+    var argv = parsed.argv
+    if (parseContext) argv = assign(argv, parseContext)
+    var aliases = parsed.aliases
+
+    argv.$0 = self.$0
+    self.parsed = parsed
+
     try {
-      var skipValidation = !!_skipValidation
-      args = args || processArgs
-
-      options.__ = y18n.__
-      options.configuration = pkgUp()['yargs'] || {}
-      const parsed = Parser.detailed(args, options)
-      var argv = parsed.argv
-      if (parseContext) argv = assign(argv, parseContext)
-      var aliases = parsed.aliases
-
-      argv.$0 = self.$0
-      self.parsed = parsed
-
       guessLocale() // guess locale lazily, so that it can be turned off in chain.
 
       // while building up the argv object, there
@@ -1061,13 +1052,12 @@ function Yargs (processArgs, cwd, parentRequire) {
           self._runValidation(argv, aliases, {}, parsed.error)
         }
       }
-
-      return setPlaceholderKeys(argv)
     } catch (err) {
-      if (!parseFn) throw err
       if (err instanceof YError) usage.fail(err.message, err)
-      else throw err // uncovered
+      else throw err
     }
+
+    return setPlaceholderKeys(argv)
   }
 
   self._runValidation = function (argv, aliases, positionalMap, parseErrors) {
